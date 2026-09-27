@@ -85,13 +85,16 @@ describe("RecentTransactions", () => {
       hasMore: false,
     });
 
-    render(<RecentTransactions />);
+    const { container } = render(<RecentTransactions />);
 
     expect(
       await screen.findByText(
         "No transactions yet. Send or receive funds to get started.",
       ),
     ).toBeTruthy();
+
+    // Inbox icon is rendered alongside the message
+    expect(container.querySelector("svg.lucide-inbox")).toBeTruthy();
 
     const cta = screen.getByRole("link", { name: /send or receive/i });
     expect(cta).toHaveAttribute("href", "/dashboard/transactions");
@@ -221,5 +224,45 @@ describe("RecentTransactions", () => {
     await waitFor(() => {
       expect(mockedFetchTransactions).toHaveBeenCalledTimes(2);
     });
+  });
+  it("applies error styling to a failed transaction row", async () => {
+    mockedFetchTransactions.mockResolvedValue({
+      data: [
+        tx({
+          id: "tx_failed",
+          hash: "hash_failed",
+          memo: "Failed payment",
+          successful: false,
+        }),
+      ],
+      total: 1,
+      page: 1,
+      limit: 3,
+      hasMore: false,
+    });
+
+    const { container } = render(<RecentTransactions />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Failed payment")).toBeTruthy();
+    });
+
+    // Asset code is rendered in the error colour rather than the default gold
+    const assetCode = screen.getByText("USDC");
+    expect(assetCode.className).toContain("text-red-400");
+    expect(assetCode.className).not.toContain("text-[#e8b84b]");
+
+    // Icon container carries the red background/border treatment
+    const iconWrapper = container.querySelector(".bg-red-500\\/10");
+    expect(iconWrapper).toBeTruthy();
+    expect(iconWrapper?.className).toContain("border-red-500/20");
+    expect(iconWrapper?.className).toContain("text-red-400");
+
+    // Failed rows use the alert icon, not a directional arrow
+    expect(container.querySelector("svg.lucide-circle-alert")).toBeTruthy();
+
+    // Trailing status dot is red rather than green/pending-gold
+    expect(container.querySelector(".bg-red-400")).toBeTruthy();
+    expect(container.querySelector(".bg-\\[\\#4ade80\\]")).toBeNull();
   });
 });
